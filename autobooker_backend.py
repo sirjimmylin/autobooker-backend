@@ -116,8 +116,8 @@ def run_monitor():
                     print(f"Monitoring {flight.flight_number}...")
                     
                     # REAL LOGIC (Commented out until Mock Airline is deployed)
-                    # airline_url = "https://YOUR-MOCK-AIRLINE.onrender.com"
-                    # status = requests.get(f"{airline_url}/check_in_status/{flight.flight_number}")
+                    airline_url = "https://mock-airline-api.onrender.com"
+                    status = requests.get(f"{airline_url}/check_in_status/{flight.flight_number}")
                     # ... (rest of logic)
 
             except Exception as e:
