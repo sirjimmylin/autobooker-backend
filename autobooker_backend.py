@@ -88,5 +88,50 @@ def update_status():
         return jsonify({"message": "Status updated"}), 200
     return jsonify({"message": "Flight not found"}), 404
 
+# ... (All your existing imports and database code)
+
+import threading
+import time
+import requests
+
+# [NEW] The Background Monitor Function
+def run_monitor():
+    with app.app_context():
+        print("☁️ Cloud Monitor Started...")
+        while True:
+            try:
+                # 1. Query Database directly (No need for HTTP requests anymore!)
+                pending_flights = Flight.query.filter_by(status='pending').all()
+                
+                if len(pending_flights) > 0:
+                    print(f"Checking {len(pending_flights)} flights...")
+                
+                for flight in pending_flights:
+                    # 2. Check the Mock Airline (Still running on your laptop? See note below)
+                    # NOTE: For this to work in the cloud, the Airline API must also be in the cloud.
+                    # For now, let's assume we are checking a real URL or a deployed Mock Airline.
+                    # If you haven't deployed the Mock Airline, this part will fail in the cloud.
+                    
+                    # For testing, we will just print status
+                    print(f"Monitoring {flight.flight_number}...")
+                    
+                    # REAL LOGIC (Commented out until Mock Airline is deployed)
+                    # airline_url = "https://YOUR-MOCK-AIRLINE.onrender.com"
+                    # status = requests.get(f"{airline_url}/check_in_status/{flight.flight_number}")
+                    # ... (rest of logic)
+
+            except Exception as e:
+                print(f"Monitor Error: {e}")
+            
+            time.sleep(10) # Sleep for 10 seconds
+
+# [NEW] Start the thread when the app starts
+# We use a trick to make sure it only runs once
+if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    monitor_thread = threading.Thread(target=run_monitor)
+    monitor_thread.daemon = True
+    monitor_thread.start()
+
+# ... (Existing main block)
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
