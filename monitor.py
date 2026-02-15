@@ -1,8 +1,9 @@
 import time
 import requests
 
-BACKEND_URL = "http://localhost:5000"
-MOCK_AIRLINE_URL = "http://localhost:5001"
+# CHANGE THIS LINE: Use 127.0.0.1 instead of localhost
+BACKEND_URL = "http://127.0.0.1:5000"
+MOCK_AIRLINE_URL = "http://127.0.0.1:5001" 
 
 def monitor_flights():
     print("Starting AutoBooker Monitor...")
@@ -11,12 +12,20 @@ def monitor_flights():
         try:
             # 1. Ask Backend for pending flights
             response = requests.get(f"{BACKEND_URL}/pending_flights")
+            
+            # --- DEBUGGING PRINT ---
+            # This will show us exactly what the backend sends back
+            print(f"DEBUG: Status {response.status_code} | Body: {response.text}") 
+            # -----------------------
+
             if response.status_code == 200:
                 watchlist = response.json()
             else:
                 watchlist = []
 
             print(f"Monitoring {len(watchlist)} flights...")
+
+            # ... (rest of your loop stays the same)
 
             for flight_data in watchlist:
                 flight_num = flight_data['flight_number']
