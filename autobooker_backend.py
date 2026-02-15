@@ -42,9 +42,17 @@ class Flight(db.Model):
     user_name = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(20), default='pending')
 
-# Create the database file if it doesn't exist
+# --- CHECK THIS PART ---
+# Ensure this is NOT just running loose.
+# It should be inside the context, or even better, just remove it for now
+# if the DB already exists.
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+        print("✅ Database connected!")
+    except Exception as e:
+        print(f"⚠️ Database warning: {e}")
+# -----------------------
 
 @app.route('/add_flight', methods=['POST'])
 def add_flight():
