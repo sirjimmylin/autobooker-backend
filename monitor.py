@@ -1,48 +1,57 @@
 import time
 import requests
 
-# The monitor runs locally/continuously
-# Function checks if flight is checked in, retries if not
-
-# Configuration
 BACKEND_URL = "http://localhost:5000"
 MOCK_AIRLINE_URL = "http://localhost:5001"
-
-# List of flights we are watching (In production, fetch this from Backend)
-watchlist = ["OPEN123", "CLOSED456"] 
 
 def monitor_flights():
     print("Starting AutoBooker Monitor...")
     
     while True:
-        for flight in watchlist:
-            # Check status on the airline side first
-            try:
-                status_response = requests.get(f"{MOCK_AIRLINE_URL}/check_in_status/{flight}")
-                
-                if status_response.status_code == 200:
-                    data = status_response.json()
-                    
-                    # If registration is open, kick off check-in function
-                    if data.get('status') == 'open':
-                        print(f"Flight {flight} is OPEN. Attempting check-in...")
-                        # Logic to trigger the check-in on our backend
-                        # We are simulating the backend logic here for the script
-                        check_in_response = requests.post(f"{MOCK_AIRLINE_URL}/check_in", json={'flight_number': flight})
-                        
-                        if check_in_response.status_code == 200:
-                            print(f"[SUCCESS] Checked into {flight}!")
-                            watchlist.remove(flight) # Stop monitoring this flight
-                        else:
-                            print(f"[RETRY] Failed to check into {flight}. Retrying...")
-                    else:
-                        print(f"Flight {flight} is not yet open.")
-                        
-            except Exception as e:
-                print(f"Connection error: {e}")
+        try:
+            # 1. Ask Backend for pending flights
+            response = requests.get(f"{BACKEND_URL}/pending_flights")
+            if response.status_code == 200:
+                watchlist = response.json()
+            else:
+                watchlist = []
 
-        # "Check every 5 minutes" (Shortened here for testing purposes)
-        time.sleep(10) # Sleep for 10 seconds for demo (Use 300 for 5 mins)
+            print(f"Monitoring {len(watchlist)} flights...")
+
+            for flight_data in watchlist:
+                flight_num = flight_data['flight_number']
+                
+                # 2. Check Airline Status
+                try:
+                    status_response = requests.get(f"{MOCK_AIRLINE_URL}/check_in_status/{flight_num}")
+                    
+                    if status_response.status_code == 200:
+                        airline_data = status_response.json()
+                        
+                        if airline_data.get('status') == 'open':
+                            print(f"Flight {flight_num} is OPEN! Checking in...")
+                            
+                            # 3. Perform Check-in
+                            check_in_resp = requests.post(f"{MOCK_AIRLINE_URL}/check_in", json={'flight_number': flight_num})
+                            
+                            if check_in_resp.status_code == 200:
+                                print(f"SUCCESS: {flight_num} checked in.")
+                                
+                                # 4. Tell Backend it is done!
+                                requests.post(f"{BACKEND_URL}/update_status", json={
+                                    'flight_number': flight_num,
+                                    'status': 'checked_in'
+                                })
+                            else:
+                                print(f"Retry: Failed to check in {flight_num}")
+                except Exception as e:
+                    print(f"Error checking airline for {flight_num}: {e}")
+
+        except Exception as e:
+            print(f"Error connecting to Backend: {e}")
+
+        # Sleep for 5 seconds before next check
+        time.sleep(5)
 
 if __name__ == "__main__":
     monitor_flights()

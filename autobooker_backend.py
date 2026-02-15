@@ -1,58 +1,57 @@
 from flask import Flask, request, jsonify
-from flask_caching import Cache
 from flask_cors import CORS
 import requests
-import datetime
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-# Configuring Flask-Caching as a memory database
-# Using memory database as per "Technical Challenges"
-app.config['CACHE_TYPE'] = 'SimpleCache'  
-cache = Cache(app)
+CORS(app)
 
-# Configuration for the Mock Airline API
 MOCK_AIRLINE_URL = "http://localhost:5001"
 
-# Database simulation (storing flights in memory)
-# User selects flight to check in
+# --- THE DATABASE (In-Memory) ---
+# We use a simple dictionary to store flight info. 
+# Key = Confirmation Number, Value = Details
+flights_db = {} 
+
 @app.route('/add_flight', methods=['POST'])
 def add_flight():
     data = request.json
     user_name = data.get('user_name')
     flight_number = data.get('flight_number')
     
-    # Store in cache (acting as our DB)
-    # Key = flight_number, Value = User details
-    cache.set(flight_number, {'user': user_name, 'status': 'pending'})
+    # Store the flight in our database
+    flights_db[flight_number] = {
+        'user': user_name, 
+        'status': 'pending',
+        'flight_number': flight_number
+    }
     
-    return jsonify({"message": "Flight added to monitor list", "flight": flight_number}), 201
+    return jsonify({"message": "Flight added", "flight": flight_number}), 201
 
-# API brings relevant info for the UI
+# [NEW] This route gives the UI the list of flights
 @app.route('/my_flights', methods=['GET'])
 def get_flights():
-    # In a real DB, we would query all. For cache, we just show a demo approach
-    # This is a simplification for the prototype
-    return jsonify({"message": "This would return list of user flights"}), 200
+    # Convert dictionary values to a list for the frontend
+    flight_list = list(flights_db.values())
+    return jsonify({"flights": flight_list}), 200
 
-# Helper function to attempt check-in with the airline
-def perform_check_in(flight_number):
-    try:
-        # Hit the /check_in route of the airline API
-        response = requests.post(f"{MOCK_AIRLINE_URL}/check_in", json={'flight_number': flight_number})
-        
-        if response.status_code == 200:
-            # If success, update status
-            cache.set(flight_number, {'status': 'checked_in'})
-            print(f"Success: {flight_number} checked in.")
-            return True
-        else:
-            # If failure, we will retry (handled by monitor)
-            print(f"Failed: {flight_number} could not be checked in.")
-            return False
-    except Exception as e:
-        print(f"Error communicating with airline: {e}")
-        return False
+# [NEW] This route gives the MONITOR the list of pending flights
+@app.route('/pending_flights', methods=['GET'])
+def get_pending_flights():
+    # Filter only for flights that are NOT checked in yet
+    pending = [f for f in flights_db.values() if f['status'] == 'pending']
+    return jsonify(pending), 200
+
+# [NEW] The Monitor calls this to update status when it succeeds
+@app.route('/update_status', methods=['POST'])
+def update_status():
+    data = request.json
+    flight_number = data.get('flight_number')
+    new_status = data.get('status')
+    
+    if flight_number in flights_db:
+        flights_db[flight_number]['status'] = new_status
+        return jsonify({"message": "Status updated"}), 200
+    return jsonify({"message": "Flight not found"}), 404
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

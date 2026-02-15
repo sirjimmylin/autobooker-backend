@@ -20,12 +20,15 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/my_flights`);
       const data = await response.json();
-      // NOTE: Since the backend currently returns a dummy message, 
-      // we will simulate a list here for your UI testing:
-      if (data) {
-        // simulating receiving a list from the backend for demo purposes
-        // In the future, this will be: setFlights(data.flights)
-        console.log("Backend Connected:", data); 
+      
+      if (data && data.flights) {
+        // Now using real data mapping
+        const formattedFlights = data.flights.map(f => ({
+          code: f.flight_number,
+          name: f.user,
+          status: f.status
+        }));
+        setFlights(formattedFlights);
       }
     } catch (error) {
       console.error("Error connecting to backend:", error);
