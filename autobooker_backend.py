@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-# ... imports
 import os # Make sure os is imported
 
 app = Flask(__name__)
 CORS(app)
+
+airline_url = "https://mock-airline-api.onrender.com"
 
 # [UPDATED] Database Configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -127,7 +128,7 @@ def run_monitor():
                     print(f"Monitoring {flight.flight_number}...")
                     
                     # REAL LOGIC (Commented out until Mock Airline is deployed)
-                    airline_url = "https://mock-airline-api.onrender.com"
+                    # airline_url = "https://mock-airline-api.onrender.com"
                     status = requests.get(f"{airline_url}/check_in_status/{flight.flight_number}")
                     # ... (rest of logic)
 
