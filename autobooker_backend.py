@@ -201,8 +201,9 @@ def manual_check():
         
     return jsonify({"logs": logs})
 
-# ... (End of file)
+@app.route('/')
+def home():
+    return "AutoBooker Backend is Online! ✈️", 200
 
-# ... (Existing main block)
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
