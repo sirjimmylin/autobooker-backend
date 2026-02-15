@@ -10,13 +10,24 @@ CORS(app)
 # [UPDATED] Database Configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Look for the Cloud Database URL first, otherwise fallback to local SQLite
+# 1. Get the URL from the environment
 database_url = os.environ.get('DATABASE_URL')
 
-# Fix for Render's postgres URL (sometimes starts with postgres:// instead of postgresql://)
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+# 2. Fix the URL for Render/PostgreSQL
+if database_url:
+    # Fix A: SQLAlchemy needs 'postgresql://', not 'postgres://'
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
+    # Fix B: FORCE SSL MODE (This fixes your error!)
+    # If the URL doesn't already have queries, add sslmode=require
+    if "sslmode" not in database_url:
+        if "?" in database_url:
+            database_url += "&sslmode=require"
+        else:
+            database_url += "?sslmode=require"
 
+# 3. Fallback to local SQLite if no cloud DB is found
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///' + os.path.join(basedir, 'autobooker.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # ... rest of code
