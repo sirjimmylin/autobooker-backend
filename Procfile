@@ -1,1 +1,1 @@
-web: gunicorn autobooker_backend:app
+web: gunicorn autobooker_backend:app --bind 0.0.0.0:$PORT
