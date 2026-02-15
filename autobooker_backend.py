@@ -1,55 +1,90 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
+from flask_sqlalchemy import SQLAlchemy
+# ... imports
+import os # Make sure os is imported
 
 app = Flask(__name__)
 CORS(app)
 
-MOCK_AIRLINE_URL = "http://localhost:5001"
+# [UPDATED] Database Configuration
+basedir = os.path.abspath(os.path.dirname(__file__))
 
-# --- THE DATABASE (In-Memory) ---
-# We use a simple dictionary to store flight info. 
-# Key = Confirmation Number, Value = Details
-flights_db = {} 
+# Look for the Cloud Database URL first, otherwise fallback to local SQLite
+database_url = os.environ.get('DATABASE_URL')
+
+# Fix for Render's postgres URL (sometimes starts with postgres:// instead of postgresql://)
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///' + os.path.join(basedir, 'autobooker.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# ... rest of code
+
+db = SQLAlchemy(app)
+
+# [NEW] The Database Model
+class Flight(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    flight_number = db.Column(db.String(20), unique=True, nullable=False)
+    user_name = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(20), default='pending')
+
+# Create the database file if it doesn't exist
+with app.app_context():
+    db.create_all()
 
 @app.route('/add_flight', methods=['POST'])
 def add_flight():
     data = request.json
+    flight_num = data.get('flight_number')
     user_name = data.get('user_name')
-    flight_number = data.get('flight_number')
     
-    # Store the flight in our database
-    flights_db[flight_number] = {
-        'user': user_name, 
-        'status': 'pending',
-        'flight_number': flight_number
-    }
+    # Check if exists
+    existing = Flight.query.filter_by(flight_number=flight_num).first()
+    if existing:
+        return jsonify({"message": "Flight already being monitored"}), 400
+        
+    new_flight = Flight(flight_number=flight_num, user_name=user_name)
+    db.session.add(new_flight)
+    db.session.commit()
     
-    return jsonify({"message": "Flight added", "flight": flight_number}), 201
+    return jsonify({"message": "Flight added", "flight": flight_num}), 201
 
-# [NEW] This route gives the UI the list of flights
 @app.route('/my_flights', methods=['GET'])
 def get_flights():
-    # Convert dictionary values to a list for the frontend
-    flight_list = list(flights_db.values())
+    flights = Flight.query.all()
+    # Convert database objects to JSON list
+    flight_list = [{
+        'flight_number': f.flight_number,
+        'user': f.user_name,
+        'status': f.status
+    } for f in flights]
     return jsonify({"flights": flight_list}), 200
 
-# [NEW] This route gives the MONITOR the list of pending flights
 @app.route('/pending_flights', methods=['GET'])
 def get_pending_flights():
-    # Filter only for flights that are NOT checked in yet
-    pending = [f for f in flights_db.values() if f['status'] == 'pending']
-    return jsonify(pending), 200
+    # [NEW] SQL Query for pending status
+    pending = Flight.query.filter_by(status='pending').all()
+    
+    output = [{
+        'flight_number': f.flight_number,
+        'user': f.user_name,
+        'status': f.status
+    } for f in pending]
+    
+    return jsonify(output), 200
 
-# [NEW] The Monitor calls this to update status when it succeeds
 @app.route('/update_status', methods=['POST'])
 def update_status():
     data = request.json
-    flight_number = data.get('flight_number')
+    flight_num = data.get('flight_number')
     new_status = data.get('status')
     
-    if flight_number in flights_db:
-        flights_db[flight_number]['status'] = new_status
+    flight = Flight.query.filter_by(flight_number=flight_num).first()
+    if flight:
+        flight.status = new_status
+        db.session.commit() # Saves the change to the file
         return jsonify({"message": "Status updated"}), 200
     return jsonify({"message": "Flight not found"}), 404
 
