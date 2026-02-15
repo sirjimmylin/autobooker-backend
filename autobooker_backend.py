@@ -173,7 +173,7 @@ def manual_check():
             status_url = f"{airline_url}/check_in_status/{flight.flight_number}"
             logs.append(f"Querying: {status_url}")
             
-            status_resp = requests.get(status_url)
+            status_resp = requests.get(status_url,timeout=10)
             logs.append(f"Airline says: {status_resp.status_code} | {status_resp.text}")
             
             data = status_resp.json()
