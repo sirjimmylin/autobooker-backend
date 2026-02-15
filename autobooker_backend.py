@@ -143,6 +143,57 @@ if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     monitor_thread.daemon = True
     monitor_thread.start()
 
+# ... (Previous code)
+
+@app.route('/manual_check', methods=['GET'])
+def manual_check():
+    logs = []
+    logs.append("🚀 Starting manual check...")
+    
+    try:
+        pending_flights = Flight.query.filter_by(status='pending').all()
+        logs.append(f"Found {len(pending_flights)} pending flights.")
+        
+        if len(pending_flights) == 0:
+            logs.append("Nothing to do!")
+        
+        for flight in pending_flights:
+            logs.append(f"--- Processing {flight.flight_number} ---")
+            
+            # 1. Check Status
+            status_url = f"{airline_url}/check_in_status/{flight.flight_number}"
+            logs.append(f"Querying: {status_url}")
+            
+            status_resp = requests.get(status_url)
+            logs.append(f"Airline says: {status_resp.status_code} | {status_resp.text}")
+            
+            data = status_resp.json()
+            
+            # 2. If Open, Check In
+            if data.get('status') == 'open':
+                logs.append("Flight is OPEN. Attempting check-in...")
+                
+                check_in_resp = requests.post(
+                    f"{airline_url}/check_in", 
+                    json={'flight_number': flight.flight_number}
+                )
+                
+                if check_in_resp.status_code == 200:
+                    flight.status = 'checked_in'
+                    db.session.commit()
+                    logs.append("✅ SUCCESS: Database updated to 'checked_in'")
+                else:
+                    logs.append(f"❌ FAIL: Airline rejected check-in ({check_in_resp.status_code})")
+            else:
+                logs.append("⏳ Flight is still CLOSED (or name doesn't start with OPEN)")
+                
+    except Exception as e:
+        logs.append(f"🔥 CRITICAL ERROR: {str(e)}")
+        
+    return jsonify({"logs": logs})
+
+# ... (End of file)
+
 # ... (Existing main block)
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
